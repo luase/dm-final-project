@@ -85,6 +85,7 @@ for row in tdfm:
     for i, element in enumerate(row):
         a.append(row[i] * idf[vocabulary[i]])
     tfidf.append(a)
+    
 # normalizar tfidf
 tfidf_norm = []
 for row in tfidf:
@@ -95,3 +96,40 @@ for row in tfidf:
     for element in row:
         new_row.append(element / a**(1/2))
     tfidf_norm.append(new_row)
+
+# calculamos el term frequency de las keywords
+keywords_tf = []
+with open('keywords.txt', 'r', encoding='utf-8') as text:
+    for line in text:
+        tokens = re.findall(r'[a-zñáíúéó]+', line)
+        vector = []
+        for word in vocabulary:
+            vector.append(tokens.count(word))
+        keywords_tf.append(vector)
+keywords_tf = np.array(keywords_tf)
+
+# calculamos la multiplicacion de idf x keywords_tf
+keywords_tfidf = []
+for row in keywords_tf:
+    a = []
+    for i, element in enumerate(row):
+        a.append(row[i] * idf[vocabulary[i]])
+    keywords_tfidf.append(a)
+
+# normalizar keywords_tfidf
+keywords_tfidf_norm = []
+for row in keywords_tfidf:
+    a = 0
+    for element in row:
+        a = a + element**2
+    new_row = []
+    for element in row:
+        new_row.append(element / a**(1/2))
+    keywords_tfidf_norm.append(new_row)
+
+for row in keywords_tfidf_norm:
+    for row2 in tfidf_norm:
+        d = 0
+        for i, element in enumerate(row2):
+            d = d + (row[i] - element)**2
+        print(d) 
