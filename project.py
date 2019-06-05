@@ -7,7 +7,8 @@ import re
 # se definen las stopwords para español
 stop_words = stopwords.words('spanish')
 stop_words = set(stop_words)
-filename = 'datata.txt'
+filename = 'data.txt'
+filename2 = 'labels.txt'
 
 # abrimos el archivo con los documentos
 with open(filename, 'r', encoding='utf-8') as data:
@@ -33,7 +34,7 @@ with open(filename, 'r', encoding='utf-8') as data:
 tdfm = np.array(tdfm)
 
 # Aqui creo el archivo nuevo con las n palabras más frecuentes de cada documento
-n = 12
+n = 8
 ind = range(len(vocabulary))
 ind = np.array(ind)
 document_keywords = []
@@ -64,7 +65,7 @@ with open('keywords.txt', 'w', encoding='utf-8') as doc:
 
 # generar el archivo con las labels nuevas
 # abrimos el archivo con las etiquetas
-with open('labels.txt', 'r', encoding='utf-8') as data:
+with open(filename2, 'r', encoding='utf-8') as data:
     labels = data.readlines()
 with open('labels_kw.txt', 'w', encoding='utf-8') as doc:
     temp = int(n/4)
@@ -127,9 +128,43 @@ for row in keywords_tfidf:
         new_row.append(element / a**(1/2))
     keywords_tfidf_norm.append(new_row)
 
+# cantidad de distancias a encontrar
+m = 3
+# encontrar las distancias euclidianas
+dist_euc_k_t = []
 for row in keywords_tfidf_norm:
+    row_dist = []
     for row2 in tfidf_norm:
         d = 0
         for i, element in enumerate(row2):
             d = d + (row[i] - element)**2
-        print(d) 
+        row_dist.append(d**(1/2))
+    dist_euc_k_t.append(row_dist)
+
+# encontrar las m distancias más cortas y sus documentos.
+# en este vector guardamos las m distancias de cada keyword ordenadas de menor a mayor
+dist_eucl_sort = []
+# en este vector guardamos los indices de las m distancias de arriba.
+eucl_dist_inde = []
+# iteramos para cada lista de distancias de cada keyword
+for distances in dist_euc_k_t:
+    ind = range(tdfm.shape[0])
+    ind = np.array(ind)
+    eucl_dist_inde.append(ind[np.argsort(distances)[:m]])
+    dist = np.array(distances)
+    dist_eucl_sort.append(dist[np.argsort(distances)[:m]])
+    
+# mostrar los resultados
+with open('keywords.txt', 'r', encoding='utf-8') as doc:
+    keywords = doc.readlines()
+with open('labels_kw.txt', 'r', encoding='utf-8') as doc:
+    labels_kw = doc.readlines()
+with open(filename, 'r', encoding='utf-8') as doc:
+    documents = doc.readlines()
+with open(filename2, 'r', encoding='utf-8') as doc:
+    labels = doc.readlines()
+
+for i, frase in enumerate(keywords):
+    print(frase.strip(), ' - ', labels_kw[i].strip())
+    for x in range(m):
+        print('\t', labels[eucl_dist_inde[i][x]].strip(),dist_eucl_sort[i][x])
