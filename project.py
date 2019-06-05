@@ -1,14 +1,16 @@
 
 from nltk.corpus import stopwords
+from math import log
 import numpy as np
 import re
 
 # se definen las stopwords para español
 stop_words = stopwords.words('spanish')
 stop_words = set(stop_words)
+filename = 'datata.txt'
 
 # abrimos el archivo con los documentos
-with open('data.txt', 'r', encoding='utf-8') as data:
+with open(filename, 'r', encoding='utf-8') as data:
     document_words = data.read().lower()
 
 # aquí se crea el vocabulario de los documentos y la frecuencia de cada término
@@ -20,7 +22,7 @@ vocabulary = [word for word in d]
 
 # Aqui se crea la matriz de term-document-frecuency
 tdfm = []
-with open('data.txt', 'r', encoding='utf-8') as data:
+with open(filename, 'r', encoding='utf-8') as data:
     for line in data:
         line = line.lower()
         tokens = re.findall(r'[a-zñáíúéó]+', line)
@@ -70,9 +72,26 @@ with open('labels_kw.txt', 'w', encoding='utf-8') as doc:
         for i in range(temp):
             doc.write("%s" % label)
 
-
-
-# for row in tdfm:
-#     print (row)
-#     break
-# print(d)
+# Computar la similaridad
+# calcular idf
+idf = {}
+for element in d:
+    idf[element] = log((1+tdfm.shape[0]) / (1+d[element]) + 1)
+# calcular tfidf
+tfidf = []
+for row in tdfm:
+    # print(row)
+    a = []
+    for i, element in enumerate(row):
+        a.append(row[i] * idf[vocabulary[i]])
+    tfidf.append(a)
+# normalizar tfidf
+tfidf_norm = []
+for row in tfidf:
+    a = 0
+    for element in row:
+        a = a + element**2
+    new_row = []
+    for element in row:
+        new_row.append(element / a**(1/2))
+    tfidf_norm.append(new_row)
