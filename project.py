@@ -1,145 +1,180 @@
-
+"""
+    Librerias de inicialización
+"""
 from nltk.corpus import stopwords
 from math import log
 import numpy as np
 import re
 
+"""
+    Aqui están definidas las funciones que se usan en el programa
+"""
+# funcion para crear un diccionario
+def dict_gen(filename):
+    # abrimos el archivo con los documentos
+    with open(filename, 'r', encoding='utf-8') as data:
+        document_words = data.read().lower()
+    # aquí se crea el diccionario de los documentos y  se calcula la frecuencia de cada término
+    d = {}
+    for word in re.findall(r'[a-zñáíúéó]+', document_words):
+        if word not in stop_words and len(word) > 2 and len(word) < 20:
+            d[word] = d.get(word, 0) + 1
+    return d
+
+# funcion para generar Term-Document-Frequency Matrix
+def tdfm_gen(filename, vocabulary):
+    tdfm = []
+    with open(filename, 'r', encoding='utf-8') as data:
+        for line in data:
+            line = line.lower()
+            tokens = re.findall(r'[a-zñáíúéó]+', line)
+            vector = []
+            for word in vocabulary:
+                vector.append(tokens.count(word))
+            tdfm.append(vector)
+    tdfm = np.array(tdfm)
+    return tdfm
+
+# funcion para crear el archivo keywords_filename
+def keywordstxt_gen(filename, tdfm, vocabulary):
+    # 'indexes' almacena los indices del vocabulario
+    indexes = np.array(range(len(vocabulary)))
+    # 'documents_keywords' guarda todas las keywords de todos los documentos ordenadas de menor a mayor frecuencia
+    documents_keywords = []
+    for row in tdfm:
+        # para cada renglón de la matriz de frecuencias
+        keywords = []
+        for index in indexes[np.argsort(row)[-n:]]:
+            # encontrar las n palabras más repetidas
+            keywords.append(vocabulary[index])
+        documents_keywords.append(keywords)
+    # 'keywords_file' almacena las keywords que irán en un archivo ordenadas de acuerdo a la definicion del problema
+    keywords_file = []
+    for document_keywords in documents_keywords:
+        # generar los n/4 documentos nuevos con las palabras más frecuentes de cada documento
+        temp = int(n/4)
+        for i in range(temp):
+            keywords = []
+            keywords.append(document_keywords[-((i*2)+1)])
+            keywords.append(document_keywords[-((i*2)+2)])
+            keywords.append(document_keywords[(i*2)+1])
+            keywords.append(document_keywords[(i*2)])
+            keywords_file.append(keywords)
+    # guardar los nuevos documentos
+    with open(filename, 'w', encoding='utf-8') as doc:
+        for keys in keywords_file:
+            for key in keys:
+                doc.write("%s " % key)
+            doc.write("\n")
+    # generar el archivo con las labels nuevas
+    # abrimos el archivo con las etiquetas
+    with open(labels_filename, 'r', encoding='utf-8') as data:
+        labels = data.readlines()
+    with open('labels_kw.txt', 'w', encoding='utf-8') as doc:
+        temp = int(n/4)
+        for label in labels:
+            for i in range(temp):
+                doc.write("%s" % label)
+
+# funcion para generar idf
+def idf_gen(dictionary):
+    idf = {}
+    for element in dictionary:
+        # calcular idf
+        idf[element] = log((1+tdfm.shape[0]) / (1+dictionary[element]) + 1)
+    return idf
+
+# funcion para multiplicar matriz 'mat' por 'idf'
+def mat_idf(mat, idf, vocabulary):
+    tdfm_idf = []
+    for row in mat:
+        a = []
+        for i, element in enumerate(row):
+            # calcular tfidf
+            a.append(element * idf[vocabulary[i]])
+        tdfm_idf.append(a)
+    return tdfm_idf
+
+# función para normalizar matriz 'mat'
+def matNorm(mat):
+    mat_norm = []
+    for row in mat:
+        a = 0
+        # encontramos la sumatoria de los cuadrados
+        for element in row:
+            a = a + element**2
+        new_row = []
+        # dividimos cada elemento entre la raiz cuadrada de la sumatoria previa
+        for element in row:
+            new_row.append(element / a**(1/2))
+        # el nuevo vector se añade a la matriz normalizada
+        mat_norm.append(new_row)
+    return mat_norm
+
+# funcion para encontrar distancia euclidiana inversa entre dos matrices.
+def matInvEuclDis(mat_a, mat_b):
+    invEuclDis = []
+    # se itera por cada renglón de la 'mat_a'
+    for row in mat_a:
+        row_invEuclDist = []
+        # se itera por cada renglón de la 'mat_b'
+        for row2 in mat_b:
+            d = 0
+            # se itera por cada elemento de cada renglón de 'mat_b'
+            for i, element in enumerate(row2):
+                # se calcula la sumatoria de los cuadrados
+                d = d + (row[i] - element)**2
+            # se guarda el valor de la inversa de la raiz de la sumatoria.
+            row_invEuclDist.append(1.0/(d**(1/2)))
+        # se guarda la lista de distancias del renglón de 'mat_a' respecto a todos los renglones de 'mat_b'
+        invEuclDis.append(row_invEuclDist)
+    return invEuclDis
+
+# funcion para encontrar la similitud de cosenos entre dos matrices.
+def matCosSim(mat_a, mat_b):
+    cosSim = []
+    # se itera por cada renglón de la 'mat_a'
+    for row in mat_a:
+        row_cosSim = []
+        # se itera por cada renglón de la 'mat_b'
+        for row2 in mat_b:
+            s = 0
+            # se itera por cada elemento de cada renglón de 'mat_b'
+            for i, element in enumerate(row2):
+                # se calcula el producto punto de los dos renglones
+                s = s + (row[i] * element)
+            # se guarda el valor del producto punto.
+            row_cosSim.append(s)
+        # se guarda la lista de similitudes por coseno del renglón de 'mat_a' respecto a todos los renglones de 'mat_b'
+        cosSim.append(row_cosSim)
+    return cosSim
+
+# función para guardar los m valores más grandes.
+def getBest(m, mat):
+    mat_sortd = []
+    mat_index = []
+
+"""
+    Variables globales de configuración del programa
+"""
 # se definen las stopwords para español
 stop_words = stopwords.words('spanish')
 stop_words = set(stop_words)
-filename = 'data.txt'
-filename2 = 'labels.txt'
+# documents_filename es el nombre del archivo con los documentos
+documents_filename = 'data.txt'
+# labels_filename es el nombre del archivo con las etiquetas de los documentos
+labels_filename = 'labels.txt'
+# 'keywords_filename' es el nombre del archivo de salida para guardar as keywords.
+keywords_filename = 'keywords.txt'
+# n es la cantidad de palabras más frecuentes que nos interesa obtener
+# de cada documento, debe ser un múltiplo de 4 preferentemente.
+n = 4
+# m es la cantidad de documentos similares que deseamos obtener por cada keyword.
+m = 5
 
-# abrimos el archivo con los documentos
-with open(filename, 'r', encoding='utf-8') as data:
-    document_words = data.read().lower()
-
-# aquí se crea el vocabulario de los documentos y la frecuencia de cada término
-d = {}
-for word in re.findall(r'[a-zñáíúéó]+', document_words):
-    if word not in stop_words and len(word) > 2 and len(word) < 20:
-        d[word] = d.get(word, 0) + 1
-vocabulary = [word for word in d]
-
-# Aqui se crea la matriz de term-document-frecuency
-tdfm = []
-with open(filename, 'r', encoding='utf-8') as data:
-    for line in data:
-        line = line.lower()
-        tokens = re.findall(r'[a-zñáíúéó]+', line)
-        vector = []
-        for word in vocabulary:
-            vector.append(tokens.count(word))
-        tdfm.append(vector)
-tdfm = np.array(tdfm)
-
-# Aqui creo el archivo nuevo con las n palabras más frecuentes de cada documento
-n = 8
-ind = range(len(vocabulary))
-ind = np.array(ind)
-document_keywords = []
-for row in tdfm:
-    # para cada renglón de la matriz de frecuencias
-    mas_frecuentes = []
-    for item in ind[np.argsort(row)[-n:]]:
-        # encontrar las n palabras más repetidas
-        mas_frecuentes.append(vocabulary[item])
-    document_keywords.append(mas_frecuentes)
-keywords = []
-for keys in document_keywords:
-    # generar los n/4 documentos nuevos con las palabras más frecuentes
-    temp = int(n/4)
-    for i in range(temp):
-        mas_frecuentes = []
-        mas_frecuentes.append(keys[-((i*2)+1)])
-        mas_frecuentes.append(keys[-((i*2)+2)])
-        mas_frecuentes.append(keys[(i*2)+1])
-        mas_frecuentes.append(keys[(i*2)])
-        keywords.append(mas_frecuentes)
-# guardar los nuevos documentos
-with open('keywords.txt', 'w', encoding='utf-8') as doc:
-    for keys in keywords:
-        for key in keys:
-            doc.write("%s " % key)
-        doc.write("\n")
-
-# generar el archivo con las labels nuevas
-# abrimos el archivo con las etiquetas
-with open(filename2, 'r', encoding='utf-8') as data:
-    labels = data.readlines()
-with open('labels_kw.txt', 'w', encoding='utf-8') as doc:
-    temp = int(n/4)
-    for label in labels:
-        for i in range(temp):
-            doc.write("%s" % label)
-
-# Computar la similaridad
-# calcular idf
-idf = {}
-for element in d:
-    idf[element] = log((1+tdfm.shape[0]) / (1+d[element]) + 1)
-# calcular tfidf
-tfidf = []
-for row in tdfm:
-    # print(row)
-    a = []
-    for i, element in enumerate(row):
-        a.append(row[i] * idf[vocabulary[i]])
-    tfidf.append(a)
-    
-# normalizar tfidf
-tfidf_norm = []
-for row in tfidf:
-    a = 0
-    for element in row:
-        a = a + element**2
-    new_row = []
-    for element in row:
-        new_row.append(element / a**(1/2))
-    tfidf_norm.append(new_row)
-
-# calculamos el term frequency de las keywords
-keywords_tf = []
-with open('keywords.txt', 'r', encoding='utf-8') as text:
-    for line in text:
-        tokens = re.findall(r'[a-zñáíúéó]+', line)
-        vector = []
-        for word in vocabulary:
-            vector.append(tokens.count(word))
-        keywords_tf.append(vector)
-keywords_tf = np.array(keywords_tf)
-
-# calculamos la multiplicacion de idf x keywords_tf
-keywords_tfidf = []
-for row in keywords_tf:
-    a = []
-    for i, element in enumerate(row):
-        a.append(row[i] * idf[vocabulary[i]])
-    keywords_tfidf.append(a)
-
-# normalizar keywords_tfidf
-keywords_tfidf_norm = []
-for row in keywords_tfidf:
-    a = 0
-    for element in row:
-        a = a + element**2
-    new_row = []
-    for element in row:
-        new_row.append(element / a**(1/2))
-    keywords_tfidf_norm.append(new_row)
-
-# cantidad de distancias a encontrar
-m = 3
-# encontrar las distancias euclidianas
-dist_euc_k_t = []
-for row in keywords_tfidf_norm:
-    row_dist = []
-    for row2 in tfidf_norm:
-        d = 0
-        for i, element in enumerate(row2):
-            d = d + (row[i] - element)**2
-        row_dist.append(d**(1/2))
-    dist_euc_k_t.append(row_dist)
+"""
+    Aqui se crea el archivo keywords_filename con (n/4) documentos nuevos por cada documento existente
+"""
 
 # encontrar las m distancias más cortas y sus documentos.
 # en este vector guardamos las m distancias de cada keyword ordenadas de menor a mayor
@@ -155,16 +190,57 @@ for distances in dist_euc_k_t:
     dist_eucl_sort.append(dist[np.argsort(distances)[:m]])
     
 # mostrar los resultados
-with open('keywords.txt', 'r', encoding='utf-8') as doc:
+with open(keywords_filename, 'r', encoding='utf-8') as doc:
     keywords = doc.readlines()
 with open('labels_kw.txt', 'r', encoding='utf-8') as doc:
     labels_kw = doc.readlines()
-with open(filename, 'r', encoding='utf-8') as doc:
+with open(documents_filename, 'r', encoding='utf-8') as doc:
     documents = doc.readlines()
-with open(filename2, 'r', encoding='utf-8') as doc:
+with open(labels_filename, 'r', encoding='utf-8') as doc:
     labels = doc.readlines()
 
 for i, frase in enumerate(keywords):
     print(frase.strip(), ' - ', labels_kw[i].strip())
     for x in range(m):
         print('\t', labels[eucl_dist_inde[i][x]].strip(),dist_eucl_sort[i][x])
+
+"""
+    main, el orden lógico del programa
+"""
+if __name__ == "__main__":
+    """
+        variables iniciales para el análisis de similaridad
+    """
+    # crear un diccionario
+    d = dict_gen(documents_filename)
+    # crear el vocabulario
+    vocabulary = [word for word in d]
+    # idf utilizando logarítmos
+    idf = idf_gen(d)
+    """
+        Aqui se crea la matriz de term-document-frecuency de los documentos y de las keywords
+    """
+    tdfm = tdfm_gen(documents_filename, vocabulary)
+    # crear el archivo keywords_filename
+    keywordstxt_gen(keywords_filename, tdfm, vocabulary)
+    keywords_tdfm = tdfm_gen(keywords_filename, vocabulary)
+    """
+        variables necesarias para computar la similaridad
+    """
+    # productio cruz tdfm x idf para los documentos y keywords
+    tdfm_idf = mat_idf(tdfm, idf, vocabulary)
+    keywords_tdfm_idf = mat_idf(keywords_tdfm, idf, vocabulary)
+    # normalización de matrices
+    tdfm_idf_norm = matNorm(tdfm_idf)
+    keywords_tdfm_idf_norm = matNorm(keywords_tdfm_idf)
+    """
+        cómputo de distancias euclidianas inversas y zimilitud de cosenos
+    """
+    invEuclDis = matInvEuclDis(keywords_tdfm_idf, tdfm_idf_norm)
+    cosSimilarity = matCosSim(keywords_tdfm_idf_norm, tdfm_idf_norm)
+    """
+        Se satisface la definición del problema:
+            "Obtener los m documentos más similares por similitud de
+             coseno y distancia euclidiana inversa."
+    """
+
