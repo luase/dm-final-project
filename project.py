@@ -1,10 +1,27 @@
-"""
-    Librerias de inicialización
-"""
 from nltk.corpus import stopwords
 from math import log
 import numpy as np
 import re
+
+"""
+    Variables globales de configuración del programa
+"""
+# se definen las stopwords para español
+stop_words = stopwords.words('spanish')
+stop_words = set(stop_words)
+# documents_filename es el nombre del archivo con los documentos
+documents_filename = 'data.txt'
+# labels_filename es el nombre del archivo con las etiquetas de los documentos
+labels_filename = 'labels.txt'
+# 'keywords_filename' es el nombre del archivo de salida para guardar las keywords.
+keywords_filename = 'keywords.txt'
+# 'keywords_label' es el nombre del archivo de salida para guardar las labels.
+keywords_labels = 'labels_kw.txt'
+# n es la cantidad de palabras más frecuentes que nos interesa obtener
+# de cada documento, debe ser un múltiplo de 4 preferentemente.
+n = 16
+# m es la cantidad de documentos similares que deseamos obtener por cada keyword.
+m = 10
 
 """
     Aqui están definidas las funciones que se usan en el programa
@@ -77,11 +94,11 @@ def keywordstxt_gen(filename, tdfm, vocabulary):
                 doc.write("%s" % label)
 
 # funcion para generar idf
-def idf_gen(dictionary):
+def idf_gen(dictionary, mat):
     idf = {}
     for element in dictionary:
         # calcular idf
-        idf[element] = log((1+tdfm.shape[0]) / (1+dictionary[element]) + 1)
+        idf[element] = log((1+mat.shape[0]) / (1+dictionary[element]) + 1)
     return idf
 
 # funcion para multiplicar matriz 'mat' por 'idf'
@@ -150,59 +167,31 @@ def matCosSim(mat_a, mat_b):
     return cosSim
 
 # función para guardar los m valores más grandes.
-def getBest(m, mat):
-    mat_sortd = []
-    mat_index = []
+def getBest(m, results):
+    # 'results_sortd' guarda los m valores más grandes en orden ascendente
+    results_sortd = []
+    # 'results_index' guarda el índice de cada documento de 'results_sortd'
+    results_index = []
+    for row in results:
+        temp_index = np.array(range(len(results[0])))
+        results_index.append(temp_index[np.argsort(row)[-m:]])
+        row_copy = np.array(row)
+        results_sortd.append(row_copy[np.argsort(row)[-m:]])
+    return results_sortd, results_index
 
-"""
-    Variables globales de configuración del programa
-"""
-# se definen las stopwords para español
-stop_words = stopwords.words('spanish')
-stop_words = set(stop_words)
-# documents_filename es el nombre del archivo con los documentos
-documents_filename = 'data.txt'
-# labels_filename es el nombre del archivo con las etiquetas de los documentos
-labels_filename = 'labels.txt'
-# 'keywords_filename' es el nombre del archivo de salida para guardar as keywords.
-keywords_filename = 'keywords.txt'
-# n es la cantidad de palabras más frecuentes que nos interesa obtener
-# de cada documento, debe ser un múltiplo de 4 preferentemente.
-n = 4
-# m es la cantidad de documentos similares que deseamos obtener por cada keyword.
-m = 5
+# función para imprimir los resultados.
+def printRes(kw_fn, kw_lb, d_lb, ind, val):
+    with open(kw_fn, 'r', encoding='utf-8') as doc:
+        keywords = doc.readlines()
+    with open(kw_lb, 'r', encoding='utf-8') as doc:
+        labels_kw = doc.readlines()
+    with open(d_lb, 'r', encoding='utf-8') as doc:
+        labels = doc.readlines()
 
-"""
-    Aqui se crea el archivo keywords_filename con (n/4) documentos nuevos por cada documento existente
-"""
-
-# encontrar las m distancias más cortas y sus documentos.
-# en este vector guardamos las m distancias de cada keyword ordenadas de menor a mayor
-dist_eucl_sort = []
-# en este vector guardamos los indices de las m distancias de arriba.
-eucl_dist_inde = []
-# iteramos para cada lista de distancias de cada keyword
-for distances in dist_euc_k_t:
-    ind = range(tdfm.shape[0])
-    ind = np.array(ind)
-    eucl_dist_inde.append(ind[np.argsort(distances)[:m]])
-    dist = np.array(distances)
-    dist_eucl_sort.append(dist[np.argsort(distances)[:m]])
-    
-# mostrar los resultados
-with open(keywords_filename, 'r', encoding='utf-8') as doc:
-    keywords = doc.readlines()
-with open('labels_kw.txt', 'r', encoding='utf-8') as doc:
-    labels_kw = doc.readlines()
-with open(documents_filename, 'r', encoding='utf-8') as doc:
-    documents = doc.readlines()
-with open(labels_filename, 'r', encoding='utf-8') as doc:
-    labels = doc.readlines()
-
-for i, frase in enumerate(keywords):
-    print(frase.strip(), ' - ', labels_kw[i].strip())
-    for x in range(m):
-        print('\t', labels[eucl_dist_inde[i][x]].strip(),dist_eucl_sort[i][x])
+    for i, frase in enumerate(keywords):
+        print(frase.strip(), ' - ', labels_kw[i].strip())
+        for x in range(m):
+            print('\t', labels[ind[i][x]].strip(), val[i][x])
 
 """
     main, el orden lógico del programa
@@ -215,8 +204,6 @@ if __name__ == "__main__":
     d = dict_gen(documents_filename)
     # crear el vocabulario
     vocabulary = [word for word in d]
-    # idf utilizando logarítmos
-    idf = idf_gen(d)
     """
         Aqui se crea la matriz de term-document-frecuency de los documentos y de las keywords
     """
@@ -227,6 +214,8 @@ if __name__ == "__main__":
     """
         variables necesarias para computar la similaridad
     """
+    # idf utilizando logarítmos
+    idf = idf_gen(d, tdfm)
     # productio cruz tdfm x idf para los documentos y keywords
     tdfm_idf = mat_idf(tdfm, idf, vocabulary)
     keywords_tdfm_idf = mat_idf(keywords_tdfm, idf, vocabulary)
@@ -243,4 +232,9 @@ if __name__ == "__main__":
             "Obtener los m documentos más similares por similitud de
              coseno y distancia euclidiana inversa."
     """
-
+    iedSortd, iedIndex = getBest(m, invEuclDis)
+    csSortd, csIndex = getBest(m, cosSimilarity)
+    """
+        Guardar los resultados a un archivo txt
+    """
+    printRes(keywords_filename, keywords_labels, labels_filename, iedIndex,iedSortd)
