@@ -180,7 +180,7 @@ def getBest(m, results):
     return results_sortd, results_index
 
 # función para imprimir los resultados.
-def printRes(kw_fn, kw_lb, d_lb, ind, val):
+def printRes(kw_fn, kw_lb, d_lb, ind, val, fn):
     with open(kw_fn, 'r', encoding='utf-8') as doc:
         keywords = doc.readlines()
     with open(kw_lb, 'r', encoding='utf-8') as doc:
@@ -188,10 +188,11 @@ def printRes(kw_fn, kw_lb, d_lb, ind, val):
     with open(d_lb, 'r', encoding='utf-8') as doc:
         labels = doc.readlines()
 
-    for i, frase in enumerate(keywords):
-        print(frase.strip(), ' - ', labels_kw[i].strip())
-        for x in range(m):
-            print('\t', labels[ind[i][-(x+1)]].strip(), val[i][-(x+1)])
+    with open(fn, 'w', encoding='utf-8') as doc:
+        for i, frase in enumerate(keywords):
+            doc.write(f'{frase.strip()}\t[{labels_kw[i].strip()}]\n')
+            for x in range(m):
+                doc.write(f'\t{labels[ind[i][-(x+1)]].strip()}\t{val[i][-(x+1)]}\n')
 
 """
     main, el orden lógico del programa
@@ -237,4 +238,5 @@ if __name__ == "__main__":
     """
         Guardar los resultados a un archivo txt
     """
-    printRes(keywords_filename, keywords_labels, labels_filename, iedIndex,iedSortd)
+    printRes(keywords_filename, keywords_labels, labels_filename, csIndex, csSortd, 'cosSimRes.txt')
+    printRes(keywords_filename, keywords_labels, labels_filename, iedIndex, iedSortd, 'invEucRes.txt')
