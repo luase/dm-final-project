@@ -19,9 +19,9 @@ keywords_filename = 'keywords.txt'
 keywords_labels = 'labels_kw.txt'
 # n es la cantidad de palabras más frecuentes que nos interesa obtener
 # de cada documento, debe ser un múltiplo de 4 preferentemente.
-n = 16
+n = 60
 # m es la cantidad de documentos similares que deseamos obtener por cada keyword.
-m = 10
+m = 5
 
 """
     Aqui están definidas las funciones que se usan en el programa
@@ -188,15 +188,26 @@ def printRes(kw_fn, kw_lb, d_lb, ind, val, fn):
     with open(d_lb, 'r', encoding='utf-8') as doc:
         labels = doc.readlines()
 
+    tp = {}
+    fp = {}
     with open(fn, 'w', encoding='utf-8') as doc:
         for i, frase in enumerate(keywords):
-            doc.write(f'{frase.strip()}\t[{labels_kw[i].strip()}]\n')
+            label_kw = labels_kw[i].strip()
+            doc.write(f'{ frase.strip() }\t[{ label_kw }]\n')
             for x in range(m):
-                doc.write(f'\t{labels[ind[i][-(x+1)]].strip()}\t{val[i][-(x+1)]}\n')
+                label_doc = labels[ind[i][-(x+1)]].strip()
+                doc.write(f'\t{label_doc}\t{val[i][-(x+1)]}\n')
+                if label_doc == label_kw:
+                    tp[label_doc] = tp.get(label_doc, 0) + 1
+                else:
+                    fp[label_kw] = fp.get(label_kw, 0) + 1
+    # aqui guarda los precision y recall por categoría
+    with open('precRec' + fn, 'w', encoding='utf-8') as doc:
+        for label in tp:
+            doc.write(f'{label}\n')
+            doc.write(f'\tprecision -- {tp[label]/(tp[label] + fp[label])}\n')
+            doc.write(f'\trecall    -- {tp[label]/tp[label]}\n')            
 
-"""
-    main, el orden lógico del programa
-"""
 if __name__ == "__main__":
     """
         variables iniciales para el análisis de similaridad
@@ -229,14 +240,10 @@ if __name__ == "__main__":
     invEuclDis = matInvEuclDis(keywords_tdfm_idf, tdfm_idf_norm)
     cosSimilarity = matCosSim(keywords_tdfm_idf_norm, tdfm_idf_norm)
     """
-        Se satisface la definición del problema:
-            "Obtener los m documentos más similares por similitud de
-             coseno y distancia euclidiana inversa."
+        Obtener los m documentos más similares por similitud de
+        coseno y distancia euclidiana inversa. y guardar resultados
     """
     iedSortd, iedIndex = getBest(m, invEuclDis)
     csSortd, csIndex = getBest(m, cosSimilarity)
-    """
-        Guardar los resultados a un archivo txt
-    """
     printRes(keywords_filename, keywords_labels, labels_filename, csIndex, csSortd, 'cosSimRes.txt')
     printRes(keywords_filename, keywords_labels, labels_filename, iedIndex, iedSortd, 'invEucRes.txt')
