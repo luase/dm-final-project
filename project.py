@@ -191,7 +191,7 @@ def printRes(kw_fn, kw_lb, d_lb, ind, val):
     for i, frase in enumerate(keywords):
         print(frase.strip(), ' - ', labels_kw[i].strip())
         for x in range(m):
-            print('\t', labels[ind[i][x]].strip(), val[i][x])
+            print('\t', labels[ind[i][-(x+1)]].strip(), val[i][-(x+1)])
 
 """
     main, el orden lógico del programa
